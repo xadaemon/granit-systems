@@ -1,13 +1,15 @@
--- Platform_Link (c) 2026 GranitBebok available under MIT license
+-- Platform_Link (c) 2026 Xadaemon available under Apache 2.0 License
 
--- Plarform link, a format for inter systems communications in stormworks
--- it works by using up to 10 of the 32 composite channels, both boolean
--- and numeric, it works with a Command and encodes Arguments with the encoding,
--- described in Plink_Encode_Params
--- we call this a command, all used parameters of a command need to have their
--- boolean value set to true, along with channel 1, this helps distinguish between
--- Plink_Command and other usages of the composite channels.
--- It has no dependencies and minifies to ~1350 characters
+-- Platform link is a concise library for data exchange using a compact
+-- encoding for data it is agnostic of I/O and it is easy to use and
+-- flexible, it allows for RPC between peers, formats and specifics for the
+-- encodings the library uses are specified in the documentation of each
+-- function that encodes.
+-- Relevant ones are:
+--  * Plink_Serialize_Table
+--  * Plink_Encode_Command
+--  * Plink_Encode_Params
+--
 
 --- @class Plink_Command
 --- @field Command number
@@ -23,10 +25,16 @@ local Plink_Fn_Registry = {}
 function Plink_Version() return { major = 1, minor = 0, rev = 0 } end
 
 --- Register a function as the handler for a verb
---- @param verb number
---- @param handler function
-function Plink_Register_Command(verb, handler)
-    Plink_Fn_Registry[verb] = handler
+--- @param Command number
+--- @param Handler function
+function Plink_Register_Command(Command, Handler)
+    Plink_Fn_Registry[Command] = Handler
+end
+
+--- Runs a decoded Command
+--- @param Command Plink_Command
+function Plink_Run_Command(Command)
+    Plink_Fn_Registry[Command.Command](Command.Arguments)
 end
 
 -- #region Serdes
