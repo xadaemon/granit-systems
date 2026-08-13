@@ -5,7 +5,7 @@
 -- flexible, it allows for RPC between peers, formats and specifics for the
 -- encodings the library uses are specified in the documentation of each
 -- function that encodes.
--- Relevant ones are:
+-- Relevant functions are:
 --  * Plink_Serialize_Table
 --  * Plink_Encode_Command
 --  * Plink_Encode_Params
