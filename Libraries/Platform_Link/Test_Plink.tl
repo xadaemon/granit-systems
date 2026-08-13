@@ -2,8 +2,8 @@ require("Plink")
 
 local function Test_Strings()
     local str = "Hello World! This is a test"
-    local ret = Plink_Encode_String(str, 40)
-    local recv = Plink_Decode_String(ret)
+    local ret = Plink_Pack(str, 40)
+    local recv = Plink_Unpack(ret)
     assert(str == recv)
 end
 

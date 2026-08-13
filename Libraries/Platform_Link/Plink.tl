@@ -89,7 +89,7 @@ end
 --- this allows to indicate which bytes of the integer are ocupied by string
 --- characters.
 --- TODO: Improve the code to unroll r when r is 4 or 8 (if code size allows)
-global function Plink_Encode_String(
+global function Plink_Pack(
     Str: string, Max_Len?: number, Int_Size?: number
 ): {integer} | nil
     local Encoded: {integer} = {}
@@ -119,7 +119,7 @@ end
 
 --- Decodes a string encoded by Encode_String see the documentation on it for
 --- details about the encoding.
-global function Plink_Decode_String(Encoded: {number}, Int_Size?: number): string | nil
+global function Plink_Unpack(Encoded: {number}, Int_Size?: number): string | nil
     local Byte_Pos: number = 0
     local Decoded: string = ""
     for i = 1, #Encoded do
@@ -139,16 +139,16 @@ global function Plink_Decode_String(Encoded: {number}, Int_Size?: number): strin
     return Decoded
 end
 
-global function Plink_Ser_Array(Data: {any}): {integer}
-    return Plink_Encode_String(Plink_Serialize_Array(Data))
+global function Plink_Pack_Array(Data: {any}): {integer}
+    return Plink_Pack(Plink_Serialize_Array(Data))
 end
 
-global function Plink_Ser_Table(Data: {string: any}): {integer}
-    return Plink_Encode_String(Plink_Serialize_Table(Data))
+global function Plink_Pack_Table(Data: {string: any}): {integer}
+    return Plink_Pack(Plink_Serialize_Table(Data))
 end
 
-global function Plink_Des(Data: {integer}): {any}
-    return Plink_Deserialize(Plink_Decode_String(Data))
+global function Plink_Unpack_Data(Data: {integer}): {any}
+    return Plink_Deserialize(Plink_Unpack(Data))
 end
 
 -- #endregion
@@ -186,7 +186,7 @@ global function Plink_Encode_Command(
     else
         Serialized_Args = Plink_Serialize_Table(Arguments)
     end
-    local Encoded_Args = Plink_Encode_String(Serialized_Args)
+    local Encoded_Args = Plink_Pack(Serialized_Args)
     if Encoded_Args is nil then
         return nil
     end
@@ -224,7 +224,7 @@ global function Plink_Decode_Command(
     -- discard lowest 6 bits, mask and read the Command number
     local Command: number = Command_Data.Command >> 6 & 1023
     local Args: {any} | number = Plink_Deserialize(
-        Plink_Decode_String(Command_Data.Encoded_Arguments)
+        Plink_Unpack(Command_Data.Encoded_Arguments)
     )
     if type(Args) == "number" then
         return nil
