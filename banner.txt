@@ -1,2 +1,2 @@
 -- The library bellow is Copyright (c) 2026 Xadaemon, Apache 2.0 licensed
--- Find documentation for the library you are using at: https://github.com/xadaemon/granit-systems/tree/master/Libraries
+-- Find documentation for the library you are using at: https://github.com/xadaemon/granit-lua/tree/master/Libraries
