@@ -6,7 +6,7 @@
 -- encodings the library uses are specified in the documentation of each
 -- function that encodes.
 -- Relevant functions are:
---  * Plink_Serialize_Table
+--  * Plink_Serialize_Table/Array
 --  * Plink_Encode_Command
 --  * Plink_Encode_Params
 --
@@ -22,7 +22,7 @@
 --- $value;...valuen; for array shaped tables
 --- NOTE: This format cannot support sub tables, this is a deliberate choice
 --- to keep the format simple and avoid recursion.
-global function Plink_Serialize_Table(Params: {string | number: any}): string
+global function Plink_Serialize_Table(Params: {string: any}): string
     local Output = "!"
     for k, v in pairs(Params) do
         Output = Output .. tostring(k) .. ":" .. tostring(v) .. ";"
@@ -30,7 +30,8 @@ global function Plink_Serialize_Table(Params: {string | number: any}): string
     return Output
 end
 
---- see Plink_Serialize_Table for format details
+--- See Plink_Serialize_Table for format details
+--- does the same but with arrays
 global function Plink_Serialize_Array(Params: {any}): string
     local Output = "$"
     for i = 1, #Params do
@@ -53,7 +54,7 @@ end
 
 --- Decodes parameters encoded by Plink_Encode_Params see that function for
 --- details on the format.
-global function Plink_Deserialize_Table(Encoded: string): {any}
+global function Plink_Deserialize(Encoded: string): {any}
     local Params: {string | number: any} = {}
     if Encoded:sub(1, 1) == "!" then
         for k, v in Encoded:gmatch("([^:]+):([^;]+);") do
@@ -90,10 +91,10 @@ end
 --- TODO: Improve the code to unroll r when r is 4 or 8 (if code size allows)
 global function Plink_Encode_String(
     Str: string, Max_Len?: number, Int_Size?: number
-): {number} | nil
-    local Encoded: {number} = {}
+): {integer} | nil
+    local Encoded: {integer} = {}
     local Current_Sub_Idx: number = 0
-    local Current_Int: number = 0
+    local Current_Int: integer = 0
 
     if math.ceil(#Str / (Int_Size or 8)) > (Max_Len or 10) then
         return nil
@@ -136,6 +137,18 @@ global function Plink_Decode_String(Encoded: {number}, Int_Size?: number): strin
         end
     end
     return Decoded
+end
+
+global function Plink_Ser_Array(Data: {any}): {integer}
+    return Plink_Encode_String(Plink_Serialize_Array(Data))
+end
+
+global function Plink_Ser_Table(Data: {string: any}): {integer}
+    return Plink_Encode_String(Plink_Serialize_Table(Data))
+end
+
+global function Plink_Des(Data: {integer}): {any}
+    return Plink_Deserialize(Plink_Decode_String(Data))
 end
 
 -- #endregion
@@ -210,7 +223,7 @@ global function Plink_Decode_Command(
     -- command is asserted valid at this point
     -- discard lowest 6 bits, mask and read the Command number
     local Command: number = Command_Data.Command >> 6 & 1023
-    local Args: {any} | number = Plink_Deserialize_Table(
+    local Args: {any} | number = Plink_Deserialize(
         Plink_Decode_String(Command_Data.Encoded_Arguments)
     )
     if type(Args) == "number" then
