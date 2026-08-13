@@ -1,3 +1,4 @@
+#! /usr/bin/env python3
 import os
 import re
 import subprocess
@@ -69,7 +70,7 @@ def process_file(filepath, processing, processed):
     all_content += content + "\n"
 
     # finally remove any require lines
-    all_content = re.sub(r'require\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)', '', all_content)
+    all_content = re.sub(r'require\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)', "", all_content)
 
     return all_content
 
@@ -80,7 +81,6 @@ def main():
         sys.exit(1)
 
     input_path = sys.argv[1]
-    max_out_size = int(sys.argv[2]) if len(sys.argv) > 3 else 8192
     input_file = Path(input_path)
     temp_path = None
 
@@ -88,42 +88,10 @@ def main():
         print(f"Error: File not found: {input_path}", file=sys.stderr)
         sys.exit(1)
 
-    try:
-        output = process_file(str(input_file), set(), set())
+    output = process_file(str(input_file), set(), set())
+    with open(f"{input_file.stem}.combi.lua", encoding="utf-8", mode="w") as f:
+        f.write(output)
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".lua", delete=False, encoding="utf-8"
-        ) as f:
-            f.write(output)
-            temp_path = f.name
-
-        result = subprocess.run(
-            ["luamin", "-f", temp_path], capture_output=True, text=True, check=True
-        )
-
-        minified = result.stdout
-        if len(minified) > max_out_size:
-            print(f"Error: Minified output exceeds {max_out_size} bytes", file=sys.stderr)
-            sys.exit(1)
-
-        output_path = str(input_file) + ".min.lua"
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(minified)
-
-        print(f"Minified output {len(minified)} long saved to: {output_path}")
-
-    except subprocess.CalledProcessError as e:
-        print(f"luamin failed: {e.stderr}", file=sys.stderr)
-        sys.exit(1)
-    except RuntimeError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-    finally:
-        try:
-            if temp_path:
-                os.unlink(temp_path)
-        except NameError:
-            pass
 
 if __name__ == "__main__":
     main()
