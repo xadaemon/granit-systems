@@ -37,15 +37,14 @@ global function Plink_Version(): Plink_Version_Info
     return { major = 1, minor = 0, rev = 0 }
 end
 
+
+
 --- Register a function as the handler for a verb
---- @param Command number
---- @param Handler function
 global function Plink_Register_Command(Command: number, Handler: function)
     Plink_Fn_Registry[Command] = Handler
 end
 
 --- Runs a decoded Command
---- @param Command Plink_Command
 global function Plink_Run_Command(Command: Plink_Command)
     Plink_Fn_Registry[Command.Command](Command.Arguments)
 end
@@ -53,14 +52,11 @@ end
 -- #region Serdes
 
 --- Encodes a map of parameters to a string in the form of:
---- !key:value;...keyn:valuen;
+--- !key:value;...keyn:valuen; for map shaped tables (key ordering not guaranteed)
 --- or
---- $value;...valuen;
+--- $value;...valuen; for array shaped tables
 --- NOTE: This format cannot support sub tables, this is a deliberate choice
 --- to keep the format simple and avoid recursion.
---- @param Params table
---- @param Encode_Map boolean?
---- @return string
 global function Plink_Serialize_Table(Params: {string | number: any}): string
         local Output = "!"
         for k, v in pairs(Params) do
@@ -69,6 +65,7 @@ global function Plink_Serialize_Table(Params: {string | number: any}): string
         return Output
 end
 
+--- see Plink_Serialize_Table for format details
 global function Plink_Serialize_Array(Params: {any}): string
     local Output = "$"
     for i = 1, #Params do
@@ -78,8 +75,6 @@ global function Plink_Serialize_Array(Params: {any}): string
 end
 
 --- Recover a type from a string
---- @param Data string
---- @return number | string | boolean
 local function Recover_Type(Data: string): number | string | boolean
     if Data == "true" or Data == "false" then
         return Data == "true"
@@ -93,7 +88,6 @@ end
 
 --- Decodes parameters encoded by Plink_Encode_Params see that function for
 --- details on the format.
---- @param Encoded string
 global function Plink_Deserialize_Table(Encoded: string): {any}
     local Params: {string | number: any} = {}
     if Encoded:sub(1, 1) == "!" then
@@ -129,17 +123,13 @@ end
 --- this allows to indicate which bytes of the integer are ocupied by string
 --- characters.
 --- TODO: Improve the code to unroll r when r is 4 or 8 (if code size allows)
---- @param Str string
---- @param Max_Len integer?
---- @param Int_Size integer? defaults to 4 byte wide ints
---- @return {number} | number
-global function Plink_Encode_String(Str: string, Max_Len?: number, Int_Size?: number): {number} | number
+global function Plink_Encode_String(Str: string, Max_Len?: number, Int_Size?: number): {number} | nil
     local Encoded: {number} = {}
     local Current_Sub_Idx: number = 0
     local Current_Int: number = 0
 
     if math.ceil(#Str / (Int_Size or 8)) > (Max_Len or 10) then
-        return math.ceil(#Str / (Int_Size or 8))
+        return nil
     end
 
     local Bytes: {number} = { string.byte(Str, 1, #Str) }
@@ -161,9 +151,6 @@ end
 
 --- Decodes a string encoded by Encode_String see the documentation on it for
 --- details about the encoding.
---- @param Encoded table<number>
---- @param Int_Size integer?
---- @return string | nil
 global function Plink_Decode_String(Encoded: {number}, Int_Size?: number): string | nil
     local Byte_Pos: number = 0
     local Decoded: string = ""
@@ -189,10 +176,7 @@ end
 -- #region Packet_Encoding
 
 --- Encodes a command and its arguments into a packet.
---- @param Command integer
---- @param Arguments table<string, any> | [any]
---- @return Plink_Encoded_Command | integer
-global function Plink_Encode_Command(Command: number, Arguments: {string | number: any}): Plink_Encoded_Command | number
+global function Plink_Encode_Command(Command: number, Arguments: {any: any}): Plink_Encoded_Command | nil
     local Serialized_Args: string = ""
     -- test if the Arguments is a map or a list
     -- this check is quite naive
@@ -202,8 +186,8 @@ global function Plink_Encode_Command(Command: number, Arguments: {string | numbe
         Serialized_Args = Plink_Serialize_Table(Arguments)
     end
     local Encoded_Args = Plink_Encode_String(Serialized_Args)
-    if Encoded_Args is number then
-        return -1
+    if Encoded_Args is nil then
+        return nil
     end
     -- encode the command with number of expected arguments
     return {
@@ -229,18 +213,16 @@ global function Plink_Get_Arg_Len(Command: number): number
 end
 
 --- Decodes a command from a packet.
---- @param Command_Data Plink_Encoded_Command
---- @return integer | Plink_Command
-global function Plink_Decode_Command(Command_Data: Plink_Encoded_Command): number | Plink_Command
+global function Plink_Decode_Command(Command_Data: Plink_Encoded_Command): Plink_Command | nil
     if not Plink_Is_Valid_Command(Command_Data.Command) then
-        return -1
+        return nil
     end
     -- command is asserted valid at this point
     -- discard lowest 6 bits, mask and read the Command number
     local Command: number = Command_Data.Command >> 6 & 1023
     local Args: {any} | number = Plink_Deserialize_Table(Plink_Decode_String(Command_Data.Encoded_Arguments))
     if type(Args) == "number" then
-        return -1
+        return nil
     end
     return { Command = Command, Arguments = Args }
 end
