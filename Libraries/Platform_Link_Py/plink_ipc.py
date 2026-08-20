@@ -1,7 +1,7 @@
 # Platform_Link (c) 2026 Xadaemon available under Apache 2.0 License
 #
 # Python port of Plink's IPC region: command framing on top of
-# plink_serdes.py. See README.md in this directory for the wire format.
+# plink_serdes.py. See docs/Plink.md (repo root) for the wire format.
 # If you only need the SerDes capability, import plink_serdes directly and
 # skip this module -- the Python equivalent of pruning the IPC region from
 # the Lua source.
