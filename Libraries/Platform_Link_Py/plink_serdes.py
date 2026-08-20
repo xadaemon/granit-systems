@@ -1,6 +1,6 @@
 # Platform_Link (c) 2026 Xadaemon available under Apache 2.0 License
 #
-# Python port of Plink's SerDes region. See README.md in this directory for
+# Python port of Plink's SerDes region. See docs/Plink.md (repo root) for
 # the wire format. This module is self contained: it owns every exception
 # type the rest of the library raises, and plink_ipc.py is the only other
 # module that imports it. If you only need the SerDes capability, importing

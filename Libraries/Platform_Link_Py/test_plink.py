@@ -3,7 +3,8 @@
 # pytest suite for the Python port of Plink. Covers everything
 # Test_Plink.tl covers, expressed with pytest idioms (parametrize,
 # pytest.raises) rather than transliterated line for line, and adapted to
-# this port's raise-on-refusal exception model -- see README.md.
+# this port's raise-on-refusal exception model -- see docs/Plink.md
+# (repo root).
 
 import pytest
 
