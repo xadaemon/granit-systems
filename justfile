@@ -7,6 +7,11 @@ build:
     cyan build
     just minify-lua "./out"
 
+test: test-lua test-py
+
+test-lua:
+    cd Libraries/Platform_Link && tl run Test_Plink.tl
+
 test-py:
     pytest Libraries/Platform_Link_Py
 
