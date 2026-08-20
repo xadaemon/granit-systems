@@ -2,6 +2,8 @@ require("Plink")
 
 local US: string = "\31"
 local RS: string = "\30"
+local DC1: string = "\17"
+local DC2: string = "\18"
 
 local function Count(Tbl: {any: any}): number
     local N: number = 0
@@ -78,7 +80,7 @@ local function Test_Format_Totality()
         tab = "a\tb",
         utf = "café",
         cjk = "日本語 café ñ",
-        ["!bang"] = "$dollar",
+        [DC1 .. "bang"] = DC2 .. "dollar",
     }
     local Wire = Plink_Serialize_Table(Cases)
     if Wire is nil then
@@ -95,7 +97,7 @@ local function Test_Format_Totality()
         end
     end
 
-    local Arr: {any} = {"a;b", "", "c:d", "100%", "café", "$x", "日本語", "a\tb"}
+    local Arr: {any} = {"a;b", "", "c:d", "100%", "café", DC1 .. "x", "日本語", "a\tb"}
     local A_Wire = Plink_Serialize_Array(Arr)
     if A_Wire is nil then
         assert(false, "Serialize_Array refused representable data")
