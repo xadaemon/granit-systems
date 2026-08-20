@@ -31,18 +31,22 @@ local DC2: string = "\18" -- Device Control 2, leading sigil for an array payloa
 --- '%' has to go first, otherwise it would escape its own output again.
 local function Escape(Data: string): string
     local Out: string = Data:gsub("%%", "%%25")
-    Out = Out:gsub("[\128-\255]", function(Byte: string): string
-        return string.format("%%%02X", string.byte(Byte))
-    end)
+    Out = Out:gsub(
+        "[\128-\255]",
+        function(Byte: string): string
+            return string.format("%%%02X", string.byte(Byte))
+        end
+    )
     return Out
 end
 
 --- Reverses Escape, every %XX pair becomes the byte it denotes. The %x%x in
 --- the pattern guarantees the capture is valid hex.
 local function Unescape(Data: string): string
-    local Out: string = Data:gsub("%%(%x%x)", function(Hex: string): string
-        return string.char(tonumber(Hex, 16))
-    end)
+    local Out: string = Data:gsub(
+        "%%(%x%x)",
+        function(Hex: string): string return string.char(tonumber(Hex, 16)) end
+    )
     return Out
 end
 
@@ -221,7 +225,7 @@ end
 
 -- #region IPC
 global record Plink_Command
-    Command: number
+    Command: integer
     Arguments: {any: any}
 end
 
@@ -327,21 +331,66 @@ global function Plink_Decode_Command(
     return {Command = Command, Arguments = Args}
 end
 
-local Plink_Fn_Registry: {number: function} = {}
-
---- Register a function as the handler for a verb
-global function Plink_Register_Command(Command: number, Handler: function)
-    Plink_Fn_Registry[Command] = Handler
+local record Plink_Handler_Info
+    Handler: function
+    Arg_Count: number
+    Named: boolean
 end
 
---- Runs a decoded Command, returns false when no handler is registered for it
-global function Plink_Run_Command(Command: Plink_Command): boolean
-    local Handler = Plink_Fn_Registry[Command.Command]
-    if Handler is nil then
+--- Register a function as the handler for a verb. Arg_Count and Named state
+--- the handler's contract: Named selects a map-shaped payload (from
+--- Plink_Serialize_Table) over an array-shaped one (from
+--- Plink_Serialize_Array), and Arg_Count is the exact number of entries
+--- expected. Plink_Run_Command checks Arguments against both before calling
+--- Handler.
+global function Plink_Register_Command(
+    Registry: {integer: Plink_Handler_Info},
+    Command: integer,
+    Handler: function,
+    Arg_Count: number,
+    Named: boolean
+)
+    Registry[Command] = {
+        Handler = Handler,
+        Arg_Count = Arg_Count,
+        Named = Named,
+    }
+end
+
+--- Runs a decoded Command against its registered handler.
+--- Returns false, without calling Handler, when no handler is registered
+--- for the command, or when Arguments doesn't match the handler's declared
+--- shape (Named) or count (Arg_Count). On a match, returns whatever Handler
+--- itself returns, unaltered.
+--- NOTE: false doubles as the failure sentinel, so a Handler that
+--- legitimately returns false is indistinguishable from a validation
+--- failure to the caller.
+global function Plink_Run_Command(
+    Registry: {integer: Plink_Handler_Info}, Command: Plink_Command
+): any
+    local Info: Plink_Handler_Info = Registry[Command.Command]
+    if Info is nil then
         return false
     end
-    Handler(Command.Arguments)
-    return true
+    -- Same naive array/map heuristic Plink_Encode_Command uses: presence of
+    -- index 1 marks an array-shaped payload. Skipped when Arg_Count is 0,
+    -- since an empty table looks the same either way.
+    local Has_Index: boolean = Command.Arguments[1] ~= nil
+    if Info.Arg_Count > 0 and Info.Named == Has_Index then
+        return false
+    end
+    local Count: number = 0
+    if Info.Named then
+        for _ in pairs(Command.Arguments) do
+            Count = Count + 1
+        end
+    else
+        Count = #(Command.Arguments as {any})
+    end
+    if Count ~= Info.Arg_Count then
+        return false
+    end
+    return Info.Handler(Command.Arguments)
 end
 
 -- #endregion

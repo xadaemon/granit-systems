@@ -161,18 +161,62 @@ local function Test_Nil_Propagation()
 end
 
 local function Test_Registry()
+    local Registry = {}
     local Seen_A: any = nil
     local Seen_B: any = nil
-    Plink_Register_Command(7, function(Args: {any})
+    Plink_Register_Command(Registry, 7, function(Args: {any}): boolean
         Seen_A = Args[1]
         Seen_B = Args[2]
-    end)
-    assert(Plink_Run_Command({Command = 7, Arguments = {1, 2}}),
-           "A registered handler should run")
+        return true
+    end, 2, false)
+    assert(Plink_Run_Command(Registry, {Command = 7, Arguments = {1, 2}}) == true,
+           "A registered handler should run and its return value pass through")
     assert(Seen_A == 1 and Seen_B == 2,
            "The handler should observe its arguments")
-    assert(not Plink_Run_Command({Command = 4242, Arguments = {}}),
+    assert(Plink_Run_Command(Registry, {Command = 4242, Arguments = {}}) == false,
            "An unregistered command should return false, not raise")
+end
+
+--- Arguments must match the handler's declared shape and count, or the
+--- handler must not run at all.
+local function Test_Registry_Validation()
+    local Registry = {}
+    local Ran: boolean = false
+
+    Plink_Register_Command(Registry, 8, function(_: {any}): boolean
+        Ran = true
+        return true
+    end, 2, false)
+
+    Ran = false
+    assert(Plink_Run_Command(Registry, {Command = 8, Arguments = {1}}) == false,
+           "Too few positional arguments should be refused")
+    assert(not Ran, "Handler must not run on a count mismatch")
+
+    Ran = false
+    assert(Plink_Run_Command(Registry, {Command = 8, Arguments = {1, 2, 3}}) == false,
+           "Too many positional arguments should be refused")
+    assert(not Ran, "Handler must not run on a count mismatch")
+
+    Ran = false
+    assert(Plink_Run_Command(Registry, {Command = 8, Arguments = {a = 1, b = 2}}) == false,
+           "A named payload fed to an anonymous handler should be refused")
+    assert(not Ran, "Handler must not run on a shape mismatch")
+
+    Plink_Register_Command(Registry, 9, function(_: {any}): boolean
+        Ran = true
+        return true
+    end, 2, true)
+
+    Ran = false
+    assert(Plink_Run_Command(Registry, {Command = 9, Arguments = {1, 2}}) == false,
+           "An anonymous payload fed to a named handler should be refused")
+    assert(not Ran, "Handler must not run on a shape mismatch")
+
+    Ran = false
+    assert(Plink_Run_Command(Registry, {Command = 9, Arguments = {a = 1, b = 2}}) == true,
+           "A matching named payload should run")
+    assert(Ran, "Handler should have run")
 end
 
 --- The header carries the packed payload length, a packet whose payload
@@ -201,6 +245,7 @@ Test_Separator_Rejection()
 Test_Size_Limits()
 Test_Nil_Propagation()
 Test_Registry()
+Test_Registry_Validation()
 Test_Decode_Integrity()
 
 print("All tests passed")

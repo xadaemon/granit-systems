@@ -1,0 +1,7 @@
+{
+  "name": "sw-sunburn-sw",
+  "private": true,
+  "devDependencies": {
+    "luamin": "^1.0.4"
+  }
+}

@@ -137,23 +137,60 @@ def Plink_Decode_Command(Command_Data: Plink_Encoded_Command) -> Plink_Command:
     return Plink_Command(Command=Command, Arguments=Args)
 
 
-_Plink_Fn_Registry: Dict[int, Callable[[Any], None]] = {}
+@dataclass
+class _Plink_Handler_Info:
+    Handler: Callable[[Any], Any]
+    Arg_Count: int
+    Named: bool
 
 
-def Plink_Register_Command(Command: int, Handler: Callable[[Any], None]) -> None:
-    """Register a function as the handler for a verb."""
-    _Plink_Fn_Registry[Command] = Handler
+Plink_Fn_Registry = Dict[int, _Plink_Handler_Info]
 
 
-def Plink_Run_Command(Command: Plink_Command) -> bool:
-    """Runs a decoded Command. Returns False when no handler is registered
-    for it -- an unknown verb from a peer is a rejection, not a raise, and
-    that's deliberate: unlike the refusal paths elsewhere in this library,
-    "nobody handles this command" is a routine, expected outcome rather
-    than a malformed payload, so it stays a boolean instead of becoming an
-    exception."""
-    Handler = _Plink_Fn_Registry.get(Command.Command)
-    if Handler is None:
+def Plink_Register_Command(
+    Registry: Plink_Fn_Registry,
+    Command: int,
+    Handler: Callable[[Any], Any],
+    Arg_Count: int,
+    Named: bool,
+) -> None:
+    """Register a function as the handler for a verb. Arg_Count and Named
+    state the handler's contract: Named selects a map-shaped payload (from
+    Plink_Serialize_Table) over an array-shaped one (from
+    Plink_Serialize_Array), and Arg_Count is the exact number of entries
+    expected. Plink_Run_Command checks Arguments against both before
+    calling Handler."""
+    Registry[Command] = _Plink_Handler_Info(
+        Handler=Handler, Arg_Count=Arg_Count, Named=Named
+    )
+
+
+def Plink_Run_Command(Registry: Plink_Fn_Registry, Command: Plink_Command) -> Any:
+    """Runs a decoded Command against its registered handler.
+
+    Returns False, without calling Handler, when no handler is registered
+    for the command, or when Arguments doesn't match the handler's declared
+    shape (Named) or count (Arg_Count). On a match, returns whatever
+    Handler itself returns, unaltered.
+
+    Unlike every other refusal path in this library, neither case raises:
+    an unknown verb, and now a mismatched payload, are both routine
+    outcomes a peer can trigger just by disagreeing about the interface --
+    not malformed data -- so this stays the one place, shared with Lua,
+    that reports failure through a return value rather than an exception.
+
+    NOTE: False doubles as the failure sentinel, so a Handler that
+    legitimately returns False is indistinguishable from a validation
+    failure to the caller -- true of the Lua implementation as well."""
+    Info = Registry.get(Command.Command)
+    if Info is None:
         return False
-    Handler(Command.Arguments)
-    return True
+    # Same naive array/map heuristic Plink_Encode_Command uses: presence of
+    # key 1 marks an array-shaped payload. Skipped when Arg_Count is 0,
+    # since an empty dict looks the same either way.
+    Has_Index = 1 in Command.Arguments
+    if Info.Arg_Count > 0 and Info.Named == Has_Index:
+        return False
+    if len(Command.Arguments) != Info.Arg_Count:
+        return False
+    return Info.Handler(Command.Arguments)

@@ -228,14 +228,28 @@ carried.
 ### Command Registration
 
 #### `Plink_Register_Command`
-Register a function as the handler for a verb.
+Register a function as the handler for a verb. Takes the handler's
+contract along with the function itself: `Arg_Count`, the exact number of
+entries `Arguments` must hold, and `Named`, whether it expects a map-shaped
+payload (from `Plink_Serialize_Table`) or an array-shaped one (from
+`Plink_Serialize_Array`). `Plink_Run_Command` checks both before calling
+the handler.
 
 #### `Plink_Run_Command`
-Runs a decoded command. Returns a boolean: false when no handler is
-registered for that command number — an unknown verb from a peer is a
-routine, expected outcome, not a refusal, so this is the one place both
-implementations agree on returning a plain boolean rather than branching on
-their refusal convention.
+Runs a decoded command against its registered handler. Returns `false`,
+without calling the handler, when no handler is registered for that command
+number, or when `Arguments` doesn't match the handler's declared `Arg_Count`
+or `Named` shape (checked with the same naive "does index 1 exist"
+heuristic `Plink_Encode_Command` uses on the way out). None of these cases
+raise — an unknown verb, and a mismatched payload, are both routine outcomes
+a peer can trigger just by disagreeing about the interface, not malformed
+data — so this is the one place both implementations agree on reporting
+failure through a return value rather than their refusal convention.
+
+On a match, returns whatever the handler itself returns, unaltered — not a
+bare `true`. Since `false` doubles as the failure sentinel, a handler that
+legitimately returns `false` is indistinguishable from a validation failure
+to the caller, in both implementations.
 
 ---
 
@@ -316,9 +330,10 @@ an exception deriving from `PlinkError` instead of returning `None`:
 Two paths are **not** converted to exceptions, because they were never
 refusals to begin with: `Plink_Unpack_Data(None)` still returns `None`
 (an absent payload in is an absent result out, not a refusal), and
-`Plink_Run_Command` still returns `bool` (see [Command
-Registration](#command-registration) — this one's shared across both
-implementations).
+`Plink_Run_Command` still reports failure through its return value — `False`
+on no handler or a mismatched payload, otherwise whatever the handler itself
+returns (see [Command Registration](#command-registration) — this one's
+shared across both implementations).
 
 This trade — exceptions with actionable messages instead of Lua's
 size-minimizing `nil`-propagation — is deliberate: this port exists to be a

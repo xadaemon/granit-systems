@@ -166,16 +166,80 @@ def test_refusal_paths():
 
 
 def test_registry():
+    registry = {}
     seen = {}
 
     def handler(args):
         seen["a"] = args[1]
         seen["b"] = args[2]
+        return True
 
-    Plink_Register_Command(7, handler)
-    assert Plink_Run_Command(Plink_Command(Command=7, Arguments={1: 1, 2: 2})) is True
+    Plink_Register_Command(registry, 7, handler, 2, False)
+    assert (
+        Plink_Run_Command(registry, Plink_Command(Command=7, Arguments={1: 1, 2: 2}))
+        is True
+    )
     assert seen == {"a": 1, "b": 2}
-    assert Plink_Run_Command(Plink_Command(Command=4242, Arguments={})) is False
+    assert (
+        Plink_Run_Command(registry, Plink_Command(Command=4242, Arguments={}))
+        is False
+    )
+
+
+def test_registry_validation():
+    """Arguments must match the handler's declared shape and count, or the
+    handler must not run at all."""
+    registry = {}
+    ran = {"value": False}
+
+    def handler(_args):
+        ran["value"] = True
+        return True
+
+    Plink_Register_Command(registry, 8, handler, 2, False)
+
+    ran["value"] = False
+    assert (
+        Plink_Run_Command(registry, Plink_Command(Command=8, Arguments={1: 1}))
+        is False
+    )
+    assert ran["value"] is False, "too few positional arguments should be refused"
+
+    ran["value"] = False
+    assert (
+        Plink_Run_Command(
+            registry, Plink_Command(Command=8, Arguments={1: 1, 2: 2, 3: 3})
+        )
+        is False
+    )
+    assert ran["value"] is False, "too many positional arguments should be refused"
+
+    ran["value"] = False
+    assert (
+        Plink_Run_Command(
+            registry, Plink_Command(Command=8, Arguments={"a": 1, "b": 2})
+        )
+        is False
+    )
+    assert ran["value"] is False, "a named payload fed to an anonymous handler should be refused"
+
+    Plink_Register_Command(registry, 9, handler, 2, True)
+
+    ran["value"] = False
+    assert (
+        Plink_Run_Command(registry, Plink_Command(Command=9, Arguments={1: 1, 2: 2}))
+        is False
+    )
+    assert ran["value"] is False, "an anonymous payload fed to a named handler should be refused"
+
+    ran["value"] = False
+    assert (
+        Plink_Run_Command(
+            registry, Plink_Command(Command=9, Arguments={"a": 1, "b": 2})
+        )
+        is True
+    )
+    assert ran["value"] is True, "a matching named payload should run"
 
 
 # The header carries the packed payload length, a packet whose payload

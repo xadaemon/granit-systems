@@ -24,7 +24,7 @@ minify-lua subdirectory:
     fi
     find "{{subdirectory}}" -type f -name "*.lua" | while read -r lua_file; do
         echo "minify $lua_file"
-        out=$(luamin -c < "$lua_file")
+        out=$(pnpm exec luamin -c < "$lua_file")
         cat "banner.txt" > $lua_file
         echo $out >> $lua_file
     done
