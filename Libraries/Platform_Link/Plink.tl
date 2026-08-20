@@ -21,6 +21,8 @@
 -- printable bytes are never special and need no escaping.
 local US: string = "\31" -- Unit Separator, between a key and its value
 local RS: string = "\30" -- Record Separator, after every record
+local DC1: string = "\17" -- Device Control 1, leading sigil for a map payload
+local DC2: string = "\18" -- Device Control 2, leading sigil for an array payload
 
 --- Escapes the bytes that cannot travel the wire as themselves:
 --- '%' becomes %25 and any byte with the high bit set becomes %XX. The high
@@ -50,18 +52,21 @@ local function Has_Separator(Data: string): boolean
 end
 
 --- Encodes a map of parameters to a string in the form of:
---- !key<US>value<RS>...keyn<US>valuen<RS> for map shaped tables
+--- <DC1>key<US>value<RS>...keyn<US>valuen<RS> for map shaped tables
 --- (key ordering not guaranteed)
 --- or
---- $value<RS>...valuen<RS> for array shaped tables
---- where <US> is 0x1F and <RS> is 0x1E. Keys and values go through Escape, so
---- every printable byte including ':' and ';' is ordinary data.
+--- <DC2>value<RS>...valuen<RS> for array shaped tables
+--- where <DC1> is 0x11, <DC2> is 0x12, <US> is 0x1F and <RS> is 0x1E. The
+--- shape marker is a control byte just like the separators, so no printable
+--- byte is ever special anywhere in the frame, not even at the very start.
+--- Keys and values go through Escape, so every printable byte including ':'
+--- and ';' is ordinary data.
 --- Returns nil when a key or value contains a separator byte, emitting one
 --- would silently corrupt the frame so it is refused instead.
 --- NOTE: This format cannot support sub tables, this is a deliberate choice
 --- to keep the format simple and avoid recursion.
 global function Plink_Serialize_Table(Params: {string: any}): string | nil
-    local Output = "!"
+    local Output = DC1
     for k, v in pairs(Params) do
         local Key: string = tostring(k)
         local Value: string = tostring(v)
@@ -76,7 +81,7 @@ end
 --- See Plink_Serialize_Table for format details
 --- does the same but with arrays
 global function Plink_Serialize_Array(Params: {any}): string | nil
-    local Output = "$"
+    local Output = DC2
     for i = 1, #Params do
         local Value: string = tostring(Params[i])
         if Has_Separator(Value) then
@@ -108,14 +113,14 @@ end
 global function Plink_Deserialize(Encoded: string): {any: any}
     local Params: {string | number: any} = {}
     local Sigil: string = Encoded:sub(1, 1)
-    -- The sigil is stripped once, here. Inside the body a leading '!' or '$'
-    -- on a key or a value is just data.
+    -- The sigil is stripped once, here. Inside the body a DC1 or DC2 byte on
+    -- a key or a value is just data.
     local Body: string = Encoded:sub(2)
-    if Sigil == "!" then
+    if Sigil == DC1 then
         for k, v in Body:gmatch("([^\31\30]*)\31([^\30]*)\30") do
             Params[Unescape(k)] = Recover_Type(Unescape(v))
         end
-    elseif Sigil == "$" then
+    elseif Sigil == DC2 then
         local i: number = 1
         for v in Body:gmatch("([^\30]*)\30") do
             Params[i] = Recover_Type(Unescape(v))

@@ -7,6 +7,9 @@ build:
     cyan build
     just minify-lua "./out"
 
+test-py:
+    pytest Libraries/Platform_Link_Py
+
 minify-lua subdirectory:
     #!/usr/bin/env bash
     set -euo pipefail

@@ -18,19 +18,21 @@ Formats and specifics for the encodings are specified in the documentation of ea
 
 ### Wire format
 
-Records are delimited by ASCII control codes, so no printable byte is ever special — `:`, `;`, `/` and friends are ordinary data.
+Records are delimited by ASCII control codes, so no printable byte is ever special — `:`, `;`, `/` and friends are ordinary data. The shape marker at the very start of the frame is a control byte too, so this holds for the entire frame, not just the records within it.
 
 | Code | Byte | Role |
 | --- | --- | --- |
+| `DC1` | `0x11` | Leading sigil, map-shaped payload |
+| `DC2` | `0x12` | Leading sigil, array-shaped payload |
 | `US` | `0x1F` | Unit Separator, between a key and its value |
 | `RS` | `0x1E` | Record Separator, after every record |
 
 ```
-map:   !key<US>value<RS>keyn<US>valuen<RS>
-array: $value<RS>valuen<RS>
+map:   <DC1>key<US>value<RS>keyn<US>valuen<RS>
+array: <DC2>value<RS>valuen<RS>
 ```
 
-The leading `!` or `$` sigil is stripped once by the parser, so a key or value may itself begin with `!` or `$`.
+The leading `DC1`/`DC2` sigil is stripped once by the parser, so a key or value may itself begin with a `DC1` or `DC2` byte.
 
 ### Escaping
 
